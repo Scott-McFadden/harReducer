@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "harReducer": {
+      "commandName": "Project",
+      "commandLineArgs": "-v -i C:\\Users\\impro\\Downloads\\2.har -o test.json"
+    }
+  }
+}
