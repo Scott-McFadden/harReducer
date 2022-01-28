@@ -16,7 +16,8 @@ namespace harReducer
         public string InFile { get; set; }
         [Option('o', HelpText = "Output File - Defaults to harout.json")]
         public string OutFile { get; set; } = "harout.json";
-        
+        [Option('c', Required = false, HelpText = "create a csv file in addition to the json")]
+        public bool CSV { get; set; }
 
     }
 }

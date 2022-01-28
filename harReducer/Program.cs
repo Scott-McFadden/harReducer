@@ -2,6 +2,7 @@
 using Newtonsoft.Json.Linq;
 using System;
 using System.IO;
+using System.Text;
 
 namespace harReducer
 {
@@ -10,35 +11,66 @@ namespace harReducer
         internal static bool Verbose = false;
         internal static string InFile = "";
         internal static string OutFile;
-        static void Main(string[] args)
+        internal static JObject entryInfo = new JObject();
+        internal static string CSVFile = "";
+        internal static bool CSV = false;
+        internal static StringBuilder s = new StringBuilder();
+        internal static string comma = "";
+
+        static int  Main(string[] args)
         {
             Console.WriteLine("harReducer v1.0");
-            Parser.Default.ParseArguments<Options>(args)
-                .WithParsed<Options>(
-                  o =>
-                  {
-                      if (o.Verbose)
+            try
+            {
+
+
+                Parser.Default.ParseArguments<Options>(args)
+                    .WithParsed<Options>(
+                      o =>
                       {
-                          Verbose = true;
-                          log("Verbose Mode Turned On");
+                          if (o.Verbose)
+                          {
+                              Verbose = true;
+                              log("Verbose Mode Turned On");
+                          }
+
+                          InFile = o.InFile;
+                          vlog($"Using ${InFile} as input file");
+
+                          OutFile = o.OutFile;
+                          vlog($"Using ${OutFile} as output file");
+
+                          CSV = o.CSV;
+                          if (CSV)
+                              CSVFile = OutFile + ".csv";
                       }
+                    );
+            } catch (Exception ex)
+            {
+                log(ex.Message);
+                return 1;
 
-                      InFile = o.InFile;
-                      vlog($"Using ${InFile} as input file");
+            }
 
-                      OutFile = o.OutFile;
-                      vlog($"Using ${OutFile} as output file");
+            try
+            {
+                ProcessHar( InFile,  OutFile,  Verbose);
+            }
+            catch (Exception ex)
+            {
+                log(ex.Message);
+                return 1;
+            }
 
-                  }
-                );
-
-            ProcessHar( InFile,  OutFile,  Verbose);
+            if (Verbose)
+                log("Exiting Normally");
+            return 0;
         }
 
         private static void ProcessHar( string inFile,  string outFile,  bool verbose)
         {
             JObject i= new JObject();
-            JObject entryInfo = new JObject();
+            
             JObject o = new JObject();
             
             JObject header = new JObject();
@@ -66,18 +98,26 @@ namespace harReducer
             vlog($"time collected: ${i["log"]["pages"][0]["startedDateTime"]}");
             header.Add(new JProperty("URL", i["log"]["pages"][0]["title"].ToString()));
             header.Add(new JProperty("collectionTime", i["log"]["pages"][0]["startedDateTime"]));
-
+            var c = 0;
             foreach(JObject j in i["log"]["entries"])
             {
+                c++;
+                
                 entryInfo = new JObject();
-                entryInfo.Add(new JProperty("url", j["request"]["url"]));
-                entryInfo.Add(new JProperty("status", j["response"]["status"]));
-                entryInfo.Add(new JProperty("size", j["response"]["content"]["size"]));
-                entryInfo.Add(new JProperty("mimeType", j["response"]["content"]["mimeType"]));
-                entryInfo.Add(new JProperty("serverIPAddress", j["serverIPAddress"]));
-                entryInfo.Add(new JProperty("time", j["time"]));
-                entryInfo.Add(new JProperty("resourceType", j["_resourceType"]));
-                entryInfo.Add(new JProperty("fromCache", j["_fromCache"]));
+                comma = "";
+                AddEntry("entry", c, c);
+                comma = ", ";
+                AddEntry("url", "\"" + j["request"]["url"].ToString() + "\"", c);
+                AddEntry("status", j["response"]["status"].ToString(), c);
+                AddEntry("size", j["response"]["content"]["size"].ToString(), c);
+                AddEntry("mimeType", j["response"]["content"]["mimeType"].ToString(), c);
+                AddEntry("serverIPAddress", j["serverIPAddress"].ToString(), c);
+                AddEntry("time", j["time"].ToString(), c);
+                AddEntry("resourceType", j["_resourceType"].ToString(), c);
+                if (j["_fromCache"] != null ) AddEntry("fromCache", j["_fromCache"].ToString(), c);
+
+                if (CSV)
+                    s.Append(Environment.NewLine);
 
                 var resourceType = j.Value<string>("_resourceType");
 
@@ -98,7 +138,9 @@ namespace harReducer
                     Other.Add(entryInfo);
 
             }
-            
+
+            header.Add(new JProperty("TotalEntries", c));
+
             o.Add(new JProperty("info", header));
             o.Add(new JProperty("Fonts", Fonts));
             o.Add(new JProperty("Images", Images));
@@ -109,14 +151,44 @@ namespace harReducer
 
             File.WriteAllText(OutFile, o.ToString());
 
-
-
+            if (CSV)
+                File.WriteAllText(CSVFile, s.ToString());
         }
+        internal static void AddEntry(string name, int value, int c)
+        {
+            if (Verbose)
+                log($"Adding Entry ${name} to entry ${c}");
+            entryInfo.Add(name, value);
+            if (CSV)
+            {
+                s.Append(comma);
+                s.Append(value);
 
+            }
+        }
+        internal static void AddEntry(string name, string value, int c )
+        {
+            log($"Adding Entry ${name} to entry ${c}");
+            entryInfo.Add(name, value);
+            if (CSV)
+            {
+                s.Append(comma);
+                if (value.Contains(","))
+                    value = value.Replace(",", ";");
+                //if (value.Contains("\""))
+                //    value = value.Replace("\"", "\"\"");
+                if (value.Contains(","))
+                    value =  value.Replace(",", ",,") ;
+
+
+                s.Append(value);
+                
+            }
+        }
         internal static void log(string msg) { Console.WriteLine(msg); }
         internal static void vlog(string msg)
         {
             if (Verbose) log(msg);
         }
     }
-}do you 
+}
